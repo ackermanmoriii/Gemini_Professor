@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="app-title">استاد مکالمه‌ای هوش مصنوعی (دو زبانه با صدا)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <style>
+        /* --- Fonts --- */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap'); 
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            min-height: 100vh;
+        }
+        .farsi-text {
+            font-family: 'Vazirmatn', sans-serif;
+            direction: rtl;
+            text-align: right;
+        }
+        /* --- Theme and Bubbles --- */
+        .professor-theme {
+            background-color: #000080;
+        }
+        .professor-bubble {
+            background-color: #ffffff;
+            border-left: 4px solid #cc0033;
+            word-break: break-word;
+        }
+        .user-bubble {
+            background-color: #e0f7fa;
+            word-break: break-word;
+        }
+        .loader {
+            border-top-color: #cc0033;
+            -webkit-animation: spin 1s linear infinite;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* --- Code Block Styling --- */
+        .code-container {
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+        }
+        .code-header {
+            background-color: #374151;
+            color: #f3f4f6;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        .code-container pre {
+            background-color: #1e293b;
+            color: #f8fafc;
+            padding: 1rem;
+            margin: 0;
+            overflow-x: auto;
+            font-family: 'Roboto Mono', monospace;
+        }
+        code {
+            font-family: 'Roboto Mono', monospace;
+            background-color: #e2e8f0;
+            padding: 0.1rem 0.3rem;
+            border-radius: 0.25rem;
+            color: #1e293b;
+        }
+        .code-container pre code {
+            background-color: transparent;
+            padding: 0;
+            color: inherit;
+        }
+        /* --- Progress List --- */
+        #progress-list {
+            max-height: 400px;
+            overflow-y: auto;
+            background-color: #ffffff;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            color: #1f2937; /* Dark text for readability */
+        }
+        #progress-list li {
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0.25rem;
+            transition: background-color 0.3s;
+        }
+        #progress-list li.completed {
+            background-color: #d4edda; /* Green-100 for completed */
+            font-weight: 600;
+        }
+        /* --- Audio Controls --- */
+        .audio-btn {
+            transition: transform 0.1s, opacity 0.3s;
+        }
+        .audio-btn:active {
+            transform: scale(0.95);
+        }
+        .audio-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* --- PDF Export Styles --- */
+        @media print {
+            body, html {
+                background-color: #ffffff !important;
+                padding: 0; margin: 0;
+            }
+            .no-print, #setup-sidebar, #input-area {
+                display: none !important;
+            }
+            .printable-area {
+                width: 100% !important;
+                box-shadow: none !important;
+                margin: 0 !important;
+                border: none !important;
+            }
+            #chat-output {
+                max-height: none !important;
+                overflow: visible !important;
+                border: none !important;
+                padding: 0 !important;
+            }
+            .professor-bubble, .user-bubble {
+                box-shadow: none !important;
+                border: 1px solid #ccc !important;
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <div class="flex-grow flex flex-col md:flex-row max-w-7xl mx-auto w-full shadow-2xl rounded-xl my-4 md:my-8 overflow-hidden">
+        
+        <div id="setup-sidebar" class="w-full md:w-1/3 p-6 professor-theme text-white space-y-6 no-print">
+            <h1 class="text-3xl font-bold border-b border-gray-400/50 pb-2">استاد مکالمه‌ای</h1>
+            <p class="text-sm opacity-90">فایل درسی خود را بارگذاری کرده و نقش و موضوع را برای یک تجربه یادگیری شخصی‌سازی شده مشخص کنید.</p>
+
+            <div class="space-y-4">
+                <div>
+                    <label for="course-file" class="block text-sm font-medium mb-1">فایل درسی (SRT, TXT, PDF, EPUB):</label>
+                    <input type="file" id="course-file" accept=".txt,.srt,.pdf,.epub" 
+                           class="w-full text-sm text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-200 file:text-gray-800 hover:file:bg-gray-300 transition-colors">
+                </div>
+                <div>
+                    <label for="subject-input" class="block text-sm font-medium mb-1">موضوع درس (به انگلیسی):</label>
+                    <input type="text" id="subject-input" placeholder="e.g., Python Pandas" 
+                           class="w-full p-2 rounded-lg text-gray-900 border border-gray-300 focus:ring-red-500 focus:border-red-500">
+                </div>
+                <div>
+                    <label for="role-input" class="block text-sm font-medium mb-1">نقش استاد (به انگلیسی):</label>
+                    <input type="text" id="role-input" placeholder="e.g., Data Analyst from Stanford" 
+                           class="w-full p-2 rounded-lg text-gray-900 border border-gray-300 focus:ring-red-500 focus:border-red-500">
+                </div>
+            </div>
+
+            <button id="start-lesson-btn" disabled 
+                    class="w-full py-3 bg-red-600 font-bold rounded-lg hover:bg-red-700 transition-colors disabled:bg-red-300 disabled:cursor-not-allowed shadow-md flex items-center justify-center">
+                <span>شروع درس</span>
+                <div class="loader ease-linear rounded-full border-2 border-t-2 border-white h-5 w-5 ml-2 hidden"></div>
+            </button>
+            
+            <hr class="border-gray-400/50">
+
+            <div id="progress-list-container" class="hidden">
+                <h2 class="text-lg font-semibold mb-2">پیشرفت درس</h2>
+                <div id="progress-bar" class="w-full bg-gray-200 h-2 rounded mb-2">
+                    <div id="progress-fill" class="bg-green-500 h-2 rounded" style="width: 0%;"></div>
+                </div>
+                <ul id="progress-list" class="space-y-2"></ul>
+            </div>
+            
+            <hr class="border-gray-400/50">
+            <div id="controls-panel" class="space-y-2 pt-2">
+                 <button onclick="toggleTranslation()" id="translation-toggle-button" 
+                        class="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:bg-green-300 disabled:cursor-not-allowed"
+                        disabled>
+                    <i class="fas fa-language"></i>
+                    <span id="translation-status-text">نمایش: انگلیسی</span>
+                </button>
+                <button onclick="window.print()"
+                        class="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg hover:bg-gray-300 transition-colors">
+                    <i class="fas fa-file-pdf"></i>
+                    <span>خروجی PDF</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="w-full md:w-2/3 flex flex-col bg-white printable-area">
+            <div id="chat-output" class="flex-grow p-6 overflow-y-auto space-y-4">
+                <div class="flex justify-start">
+                     <div class="max-w-4xl p-4 rounded-xl shadow-lg professor-bubble" 
+                         data-en="Welcome! Please load your course file, subject, and professor's role in the sidebar to begin the lesson."
+                         data-fa="خوش آمدید! لطفاً فایل درسی، موضوع و نقش استاد را در نوار کناری وارد کنید تا درس شروع شود.">
+                        Welcome! Please load your course file, subject, and professor's role in the sidebar to begin the lesson.
+                    </div>
+                </div>
+            </div>
+
+            <form id="input-area" class="p-4 border-t border-gray-200 flex space-x-2 no-print" style="display: none;">
+                <input type="text" id="user-input" placeholder="پیام خود را به استاد بنویسید..." 
+                       class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500">
+                <button type="submit" id="send-btn" 
+                        class="px-6 py-3 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:bg-red-300 flex items-center justify-center">
+                    <span id="send-text">ارسال</span>
+                    <div id="send-loader" class="loader ease-linear rounded-full border-2 border-t-2 border-white h-5 w-5 ml-2 hidden"></div>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- Core Configuration ---
+        const TEXT_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=";
+        const TTS_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=";
+        const apiKey = "AIzaSyBbE91821d1xzgrh4or2S_B7vPgfZatbJc"; // IMPORTANT: Replace with your actual Google AI API key
+        
+        // --- TTS Voice Configuration ---
+        const PERSIAN_TTS_VOICE = 'Kore'; 
+        const ENGLISH_TTS_VOICE = 'Kore'; 
+        
+        // --- Global State ---
+        let lessonHistory = [];
+        let lessonContent = "";
+        let isProcessing = false;
+        let activeAudios = [];
+        let progressItems = [];
+        let currentProgressIndex = -1;
+        let displayLanguage = 'en'; 
+
+        // --- Professor Profile ---
+        let currentProfessorProfile = {
+            subject: "Topic",
+            persona: "Professor"
+        };
+        
+        // --- REVISED System Instruction Template ---
+        const systemInstructionTemplate = (content, profile, progress) => `
+            You are a highly structured and interactive **${profile.persona}** specializing in **${profile.subject}**. Your teaching is based ONLY on the provided curriculum material.
+
+            The current course material is:
+            ---
+            ${content}
+            ---
+            
+            The lesson is broken down into these topics:
+            ---
+            ${progress.map((item, index) => `${index}. ${item.en}`).join('\n')}
+            ---
+
+            **Teaching Protocol (CRITICAL):**
+            1.  **STARTING THE LESSON:** If the conversation history is empty, you MUST begin with Topic 0. Execute the complete teaching structure (Concept, Breakdown, Challenge Step 1) for the VERY FIRST topic in your first response.
+            2.  **PROGRESSION:** Move to the next topic ONLY after the student correctly completes the challenge for the current topic.
+            3.  **VERIFICATION:** If the student responds to a challenge, VERIFY their answer.
+                * If **correct**, praise them, introduce the NEXT topic, and issue the first challenge for that new topic.
+                * If **incorrect**, provide expert feedback, guide them, and then RE-ISSUE the current step.
+            4.  **COMPLETION:** After the final topic's challenge is complete, provide a summary and set [IS_FINISHED] to 'true'.
+
+            **Output Structure (CRITICAL):**
+            Your response MUST contain SIX distinct, delimited sections, in this exact order.
+
+            [ENGLISH_RESPONSE]
+            The professor's full conversational English response, including markdown for code, etc.
+            [/ENGLISH_RESPONSE]
+
+            [FARSI_RESPONSE]
+            A professional Persian translation of the FULL [ENGLISH_RESPONSE], preserving all markdown.
+            [/FARSI_RESPONSE]
+
+            [TTS_ENGLISH]
+            The plain English text for Text-to-Speech. This MUST be ONLY the conversational part, EXCLUDING all code blocks, commands, and structural markdown.
+            [/TTS_ENGLISH]
+
+            [TTS_PERSIAN]
+            A smooth, professional Persian translation of the text from [TTS_ENGLISH].
+            [/TTS_PERSIAN]
+
+            [PROGRESS_INDEX]
+            The numerical index (e.g., 0, 1, 2) of the topic from the progress list that you are currently teaching.
+            [/PROGRESS_INDEX]
+            
+            [IS_FINISHED]
+            true|false
+            [/IS_FINISHED]
+        `;
+
+        // --- Audio Generation & Handling (from voice_pause_02.html) ---
+
+        function base64ToArrayBuffer(base64) {
+            const binaryString = atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function pcmToWav(pcm16, sampleRate = 24000) {
+            const buffer = new ArrayBuffer(44 + pcm16.length * 2);
+            const view = new DataView(buffer);
+            
+            const writeString = (view, offset, str) => {
+                for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+            };
+
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + pcm16.length * 2, true);
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(view, 36, 'data');
+            view.setUint32(40, pcm16.length * 2, true);
+            
+            let offset = 44;
+            for (let i = 0; i < pcm16.length; i++, offset += 2) {
+                view.setInt16(offset, pcm16[i], true);
+            }
+            return new Blob([view], { type: 'audio/wav' });
+        }
+
+        async function generateTTS(text, languageCode, voiceName) {
+            if (!text || text.trim() === '') return null;
+            
+            const payload = {
+                contents: [{ parts: [{ text: text }] }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName } },
+                        languageCode: languageCode
+                    }
+                },
+                model: "gemini-1.5-flash-preview-tts"
+            };
+
+            const maxRetries = 4; // Increased retries for rate limiting
+            let delay = 1000; // Start with a 1-second delay
+
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(TTS_API_URL + apiKey, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    // If we get a 429 error, wait and retry
+                    if (response.status === 429) {
+                        console.warn(`Rate limit hit for ${languageCode}. Retrying in ${delay / 1000}s...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2; // Double the delay for the next potential failure
+                        continue; // Skip to the next iteration to retry
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(`TTS API failed with status ${response.status}.`);
+                    }
+                    
+                    const result = await response.json();
+                    const audioData = result?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+
+                    if (audioData) {
+                        const pcmData = base64ToArrayBuffer(audioData);
+                        const pcm16 = new Int16Array(pcmData);
+                        const wavBlob = pcmToWav(pcm16, 24000);
+                        return { url: URL.createObjectURL(wavBlob), blob: wavBlob };
+                    }
+                    throw new Error("TTS API returned no audio data.");
+                } catch (e) {
+                    if (i === maxRetries - 1) { // If it's the last retry, throw the final error
+                         throw new Error(`Failed to generate audio for ${languageCode} after multiple retries. Last error: ${e.message}`);
+                    }
+                }
+            }
+        }
+
+        const playIcon = `<svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M7 6v12l10-6z"/></svg>`;
+        const pauseIcon = `<svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h4v12H6zm8 0h4v12h-4z"/></svg>`;
+
+        function pauseAllAudios() {
+            activeAudios.forEach(({ audio, playBtn }) => {
+                if (!audio.paused) {
+                    audio.pause();
+                    playBtn.innerHTML = playIcon;
+                    playBtn.setAttribute('data-playing', 'false');
+                }
+            });
+        }
+
+        const togglePlayPause = (audio, playBtn) => {
+            if (audio.paused) {
+                pauseAllAudios();
+                audio.play();
+                playBtn.innerHTML = pauseIcon;
+                playBtn.setAttribute('data-playing', 'true');
+            } else {
+                audio.pause();
+                playBtn.innerHTML = playIcon;
+                playBtn.setAttribute('data-playing', 'false');
+            }
+        };
+        
+        const handleDownload = (blob, fileName) => {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        };
+        
+        // --- UI & Utility Functions (from yummy.html) ---
+
+        function markdownToHtml(markdown) {
+            let html = markdown.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            
+            html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+                code = code.replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+                const language = lang.trim() || 'bash';
+                return `<div class="code-container"><div class="code-header">${language}</div><pre><code>${code.trim()}</code></pre></div>`;
+            });
+
+            return html
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/\n/g, '<br>');
+        }
+        
+        function renderMessagesByLanguage() {
+            document.getElementById('translation-status-text').textContent = displayLanguage === 'en' ? 'Display: Farsi' : 'نمایش: انگلیسی';
+            document.querySelectorAll('.professor-bubble').forEach(bubble => {
+                const enText = bubble.getAttribute('data-en');
+                const faText = bubble.getAttribute('data-fa');
+                if (enText && faText) {
+                    const content = displayLanguage === 'en' ? enText : faText;
+                    bubble.innerHTML = markdownToHtml(content);
+                    bubble.classList.toggle('farsi-text', displayLanguage === 'fa');
+                }
+            });
+            updateProgressList();
+            document.getElementById('chat-output').scrollTop = document.getElementById('chat-output').scrollHeight;
+        }
+
+        function updateProgressList() {
+            const progressList = document.getElementById('progress-list');
+            progressList.innerHTML = '';
+            progressItems.forEach((item, index) => {
+                const li = document.createElement('li');
+                li.textContent = displayLanguage === 'en' ? item.en : item.fa;
+                if (index <= currentProgressIndex) li.classList.add('completed');
+                progressList.appendChild(li);
+            });
+
+            const progress = progressItems.length > 0 ? ((currentProgressIndex + 1) / progressItems.length * 100) : 0;
+            document.getElementById('progress-fill').style.width = `${progress}%`;
+        }
+        
+        window.toggleTranslation = function() {
+            if (isProcessing) return;
+            pauseAllAudios();
+            displayLanguage = displayLanguage === 'en' ? 'fa' : 'en';
+            renderMessagesByLanguage();
+        };
+
+        function addMessage(data) {
+            const { role, en_text, fa_text, tts_en, tts_fa } = data;
+            const chatOutput = document.getElementById('chat-output');
+            
+            const isProfessor = role === 'professor';
+            const alignment = isProfessor ? 'items-start' : 'items-end';
+            // --- THIS IS THE MISSING LINE THAT IS NOW FIXED ---
+            const bubbleClass = isProfessor ? 'professor-bubble' : 'user-bubble';
+            
+            const displayContent = isProfessor 
+                ? (displayLanguage === 'en' ? en_text : fa_text) 
+                : en_text;
+
+            const messageContainer = document.createElement('div');
+            messageContainer.className = `flex flex-col ${alignment} w-full`;
+
+            const bubble = document.createElement('div');
+            bubble.className = `max-w-xl p-4 rounded-xl shadow-lg ${bubbleClass}`; // This line now works correctly
+            bubble.innerHTML = markdownToHtml(displayContent);
+            
+            messageContainer.appendChild(bubble);
+
+            if (isProfessor) {
+                bubble.setAttribute('data-en', en_text);
+                bubble.setAttribute('data-fa', fa_text);
+                bubble.classList.toggle('farsi-text', displayLanguage === 'fa');
+                
+                const controlsDiv = document.createElement('div');
+                controlsDiv.className = 'flex flex-wrap gap-2 items-center pt-2 mt-2 border-t border-gray-100 w-full max-w-xl';
+                controlsDiv.innerHTML = `
+                    <div class="flex items-center space-x-1">
+                        <button class="audio-btn play-en-btn bg-blue-600 text-white p-2 rounded-full shadow-lg" title="Play English">${playIcon}</button>
+                        <button class="audio-btn download-en-btn bg-blue-400 text-white p-2 rounded-full shadow-lg" title="Download English"><i class="fas fa-download"></i></button>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <button class="audio-btn play-fa-btn bg-red-600 text-white p-2 rounded-full shadow-lg" title="Play Persian">${playIcon}</button>
+                        <button class="audio-btn download-fa-btn bg-red-400 text-white p-2 rounded-full shadow-lg" title="Download Persian"><i class="fas fa-download"></i></button>
+                    </div>
+                    <span class="tts-status text-xs text-gray-500 ml-auto">Generating audio...</span>`;
+
+                messageContainer.appendChild(controlsDiv);
+                
+                const statusSpan = controlsDiv.querySelector('.tts-status');
+                const enBtn = controlsDiv.querySelector('.play-en-btn');
+                const faBtn = controlsDiv.querySelector('.play-fa-btn');
+                const enDownloadBtn = controlsDiv.querySelector('.download-en-btn');
+                const faDownloadBtn = controlsDiv.querySelector('.download-fa-btn');
+
+                [enBtn, faBtn, enDownloadBtn, faDownloadBtn].forEach(b => b.disabled = true);
+                
+                (async () => {
+                    const enResult = await generateTTS(tts_en, 'en-US', ENGLISH_TTS_VOICE);
+                    const faResult = await generateTTS(tts_fa, 'fa-IR', PERSIAN_TTS_VOICE);
+
+                    if (enResult) {
+                        const enAudio = new Audio(enResult.url);
+                        activeAudios.push({ audio: enAudio, playBtn: enBtn });
+                        enAudio.onended = () => { enBtn.innerHTML = playIcon; enBtn.setAttribute('data-playing', 'false'); };
+                        enBtn.onclick = () => togglePlayPause(enAudio, enBtn);
+                        enDownloadBtn.onclick = () => handleDownload(enResult.blob, `en-audio.wav`);
+                        enBtn.disabled = false;
+                        enDownloadBtn.disabled = false;
+                    }
+                     if (faResult) {
+                        const faAudio = new Audio(faResult.url);
+                        activeAudios.push({ audio: faAudio, playBtn: faBtn });
+                        faAudio.onended = () => { faBtn.innerHTML = playIcon; faBtn.setAttribute('data-playing', 'false'); };
+                        faBtn.onclick = () => togglePlayPause(faAudio, faBtn);
+                        faDownloadBtn.onclick = () => handleDownload(faResult.blob, `fa-audio.wav`);
+                        faBtn.disabled = false;
+                        faDownloadBtn.disabled = false;
+                    }
+                    statusSpan.textContent = (enResult || faResult) ? "Audio Ready" : "Audio Failed";
+                })();
+
+            }
+            chatOutput.appendChild(messageContainer);
+            chatOutput.scrollTop = chatOutput.scrollHeight;
+        }
+
+        function setLoading(loading, buttonId, originalText) {
+            isProcessing = loading;
+            const button = document.getElementById(buttonId);
+            if (!button) return;
+
+            const textSpan = button.querySelector('span');
+            const loader = button.querySelector('.loader');
+
+            button.disabled = loading;
+            document.getElementById('translation-toggle-button').disabled = loading;
+
+            if (textSpan) {
+                textSpan.textContent = loading ? '...' : originalText;
+            } else {
+                 button.textContent = loading ? '...' : originalText;
+            }
+            if(loader) {
+                loader.classList.toggle('hidden', !loading);
+            }
+        }
+        
+        function checkInputsAndFile() {
+            const file = document.getElementById('course-file').files[0];
+            const subject = document.getElementById('subject-input').value.trim();
+            const role = document.getElementById('role-input').value.trim();
+            document.getElementById('start-lesson-btn').disabled = !(file && subject && role);
+        }
+
+        // --- Core AI Logic & Flow ---
+
+        async function generateProgressList(content) {
+            const prompt = `Analyze the following educational content. Create a concise, ordered list of key topics. Output a JSON array where each object has "en" (English topic) and "fa" (Persian translation).
+            Content: """${content}"""`;
+            
+            const payload = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } };
+            try {
+                const response = await fetch(TEXT_API_URL + apiKey, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error("API failed to generate progress list.");
+                const result = await response.json();
+                const jsonText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+                return JSON.parse(jsonText);
+            } catch (error) {
+                console.error('Error generating progress list:', error);
+                return [{ en: "Main Topic", fa: "موضوع اصلی" }]; // Fallback
+            }
+        }
+        
+        async function generateTextResponse(history, systemInstruction) {
+            const payload = { contents: history, systemInstruction: { parts: [{ text: systemInstruction }] } };
+            const maxRetries = 3;
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(TEXT_API_URL + apiKey, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!response.ok) throw new Error(`API request failed with status: ${response.status}`);
+                    const result = await response.json();
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (text) return text;
+                    throw new Error("Received empty response from AI.");
+                } catch (error) {
+                    if (i === maxRetries - 1) throw error;
+                    await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+                }
+            }
+        }
+        
+        // --- REVISED Parser ---
+        function parseProfessorResponse(rawResponse) {
+            const extract = (tag) => (rawResponse.match(new RegExp(`\\[${tag}\\]([\\s\\S]*?)\\[/${tag}\\]`, 'i')) || [])[1]?.trim() || '';
+            
+            const englishResponse = extract('ENGLISH_RESPONSE');
+            if (!englishResponse) return { success: false, message: "The professor's response was malformed." };
+
+            return {
+                success: true,
+                englishResponse: englishResponse,
+                farsiResponse: extract('FARSI_RESPONSE'),
+                ttsEnglish: extract('TTS_ENGLISH'),
+                ttsPersian: extract('TTS_PERSIAN'),
+                progressIndex: parseInt(extract('PROGRESS_INDEX'), 10) || 0,
+                isFinished: extract('IS_FINISHED').toLowerCase() === 'true'
+            };
+        }
+        
+        async function startLesson(file) {
+            if (isProcessing) return;
+            setLoading(true, 'start-lesson-btn', 'شروع درس');
+
+            currentProfessorProfile.subject = document.getElementById('subject-input').value.trim();
+            currentProfessorProfile.persona = document.getElementById('role-input').value.trim();
+            
+            lessonContent = await file.text();
+            lessonHistory = [];
+            currentProgressIndex = -1;
+
+            progressItems = await generateProgressList(lessonContent);
+            document.getElementById('progress-list-container').classList.remove('hidden');
+            updateProgressList();
+
+            document.getElementById('chat-output').innerHTML = '';
+            document.getElementById('input-area').style.display = 'flex';
+            document.getElementById('start-lesson-btn').style.display = 'none';
+            document.getElementById('translation-toggle-button').disabled = false;
+            
+            try {
+                const initialPrompt = `Professor, the curriculum is loaded. Please begin the lesson immediately by following your core protocol, starting with the first topic.`;
+                lessonHistory.push({ role: "user", parts: [{ text: initialPrompt }] });
+                
+                const fullSystemInstruction = systemInstructionTemplate(lessonContent, currentProfessorProfile, progressItems);
+                const rawResponse = await generateTextResponse(lessonHistory, fullSystemInstruction);
+                const parsed = parseProfessorResponse(rawResponse);
+
+                if (parsed.success) {
+                    lessonHistory.push({ role: "model", parts: [{ text: rawResponse }] });
+                    currentProgressIndex = parsed.progressIndex;
+                    updateProgressList();
+                    addMessage({
+                        role: 'professor',
+                        en_text: parsed.englishResponse,
+                        fa_text: parsed.farsiResponse,
+                        tts_en: parsed.ttsEnglish,
+                        tts_fa: parsed.ttsPersian
+                    });
+                } else {
+                     addMessage({role: 'professor', en_text: `**System Error:** ${parsed.message}`, fa_text: `**خطای سیستم:** ${parsed.message}`});
+                }
+            } catch (error) {
+                 addMessage({role: 'professor', en_text: `**Lesson Start Error:** ${error.message}`, fa_text: `**خطای شروع درس:** ${error.message}`});
+            } finally {
+                setLoading(false, 'start-lesson-btn', 'شروع درس');
+            }
+        }
+        
+        async function sendMessage(event) {
+            event.preventDefault();
+            const inputElement = document.getElementById('user-input');
+            const userMessage = inputElement.value.trim();
+            if (!userMessage || isProcessing) return;
+
+            pauseAllAudios();
+            addMessage({ role: 'user', en_text: userMessage, fa_text: userMessage });
+            lessonHistory.push({ role: "user", parts: [{ text: userMessage }] });
+            inputElement.value = '';
+            setLoading(true, 'send-btn', 'ارسال');
+
+            try {
+                const fullSystemInstruction = systemInstructionTemplate(lessonContent, currentProfessorProfile, progressItems);
+                const rawResponse = await generateTextResponse(lessonHistory, fullSystemInstruction);
+                const parsed = parseProfessorResponse(rawResponse);
+
+                if (parsed.success) {
+                    lessonHistory.push({ role: "model", parts: [{ text: rawResponse }] });
+                    currentProgressIndex = parsed.progressIndex;
+                    updateProgressList();
+                    addMessage({
+                        role: 'professor',
+                        en_text: parsed.englishResponse,
+                        fa_text: parsed.farsiResponse,
+                        tts_en: parsed.ttsEnglish,
+                        tts_fa: parsed.ttsPersian
+                    });
+                    
+                    if (parsed.isFinished) {
+                        document.getElementById('input-area').style.display = 'none';
+                        addMessage({role: 'professor', en_text: "Lesson complete!", fa_text: "درس تمام شد!", tts_en: "Lesson complete!", tts_fa: "درس تمام شد!"});
+                    }
+                } else {
+                     addMessage({role: 'professor', en_text: `**System Error:** ${parsed.message}`, fa_text: `**خطای سیستم:** ${parsed.message}`});
+                }
+            } catch (error) {
+                addMessage({role: 'professor', en_text: `**Chat Error:** ${error.message}`, fa_text: `**خطای چت:** ${error.message}`});
+            } finally {
+                setLoading(false, 'send-btn', 'ارسال');
+            }
+        }
+
+        // --- Event Listeners ---
+        document.getElementById('course-file').addEventListener('change', checkInputsAndFile);
+        document.getElementById('subject-input').addEventListener('input', checkInputsAndFile);
+        document.getElementById('role-input').addEventListener('input', checkInputsAndFile);
+        document.getElementById('start-lesson-btn').addEventListener('click', () => {
+            const file = document.getElementById('course-file').files[0];
+            if (file) startLesson(file);
+        });
+        document.getElementById('input-area').addEventListener('submit', sendMessage);
+        
+        window.onload = checkInputsAndFile;
+    </script>
+</body>
+</html>
